@@ -238,17 +238,34 @@ for msg in st.session_state.chat_history_obj.messages:
             st.markdown(f"<span style='font-size:24px;'>{msg.content}</span>", unsafe_allow_html=True)
 
 
-# 사용자가 질문을 입력하는 부분 - key를 추가하여 DuplicateElementId 오류 방지
-if prompt_message := st.chat_input("치매에 대해 궁금한 점을 여기에 입력해 주세요.", key="chat_input_unique_key"):
-    if conversational_rag_chain:
-        # 1. 사용자 메시지를 chat_history_obj에 추가
-        st.session_state.chat_history_obj.add_user_message(prompt_message)
-        
-        # 2. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
-        st.session_state.chat_history_obj.add_ai_message("") 
-        
-        # 3. 앱을 새로고침하여 사용자 메시지(새로 추가된 것)가 표시되도록 합니다.
-        st.rerun() 
+# 사용자가 질문을 입력하는 부분
+# chat_input의 value를 직접 제어하기 어렵기 때문에,
+# 사용자 입력 후 st.rerun()을 호출하면 이전 입력값이 UI에 남는 경향이 있습니다.
+# 이를 해결하기 위해 입력값이 비어있을 때만 chat_input을 표시하도록 하거나,
+# 아니면 입력 처리 후 st.session_state에 특정 플래그를 두어 UI를 조정하는 고급 기법이 필요합니다.
+# 현재 문제는 chat_input의 '기억' 때문에 발생하는 것이므로,
+# 메시지 히스토리 자체의 중복과는 다릅니다.
+
+# prompt_message를 글로벌 스코프가 아닌 필요한 로직 블록 안에서만 처리하도록 변경
+# 챗봇 입력 필드 (key는 필수)
+if 'user_input_key' not in st.session_state:
+    st.session_state.user_input_key = 0 # st.chat_input의 key를 제어하기 위한 카운터
+
+prompt_message = st.chat_input("치매에 대해 궁금한 점을 여기에 입력해 주세요.", key=f"chat_input_{st.session_state.user_input_key}")
+
+if prompt_message and conversational_rag_chain:
+    # 1. 사용자 메시지를 chat_history_obj에 추가
+    st.session_state.chat_history_obj.add_user_message(prompt_message)
+    
+    # 2. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
+    st.session_state.chat_history_obj.add_ai_message("") 
+    
+    # st.chat_input의 key를 변경하여 입력 필드를 초기화
+    st.session_state.user_input_key += 1
+    
+    # 3. 앱을 새로고침하여 사용자 메시지(새로 추가된 것)가 표시되도록 합니다.
+    #    새로운 key로 chat_input이 그려지면서 이전 입력값이 사라집니다.
+    st.rerun() 
 
 # --- AI 응답 생성 및 타이핑 효과 부분 (새로고침 후 실행) ---
 # 이 부분은 `st.rerun()` 호출 후, 앱이 다시 시작될 때 실행됩니다.
