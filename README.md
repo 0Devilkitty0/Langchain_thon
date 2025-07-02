@@ -23,8 +23,8 @@
 |----------------|------|
 | **UI**         | Streamlit 기반 채팅 인터페이스 |
 | **문서 로더**  | `PyPDFLoader` (PDF → 텍스트 분할) |
-| **텍스트 분할기** | `RecursiveCharacterTextSplitter` (chunk_size=500, overlap=100) |
-| **임베딩 모델** | OpenAI `text-embedding-3-small` |
+| **텍스트 분할기** | `RecursiveCharacterTextSplitter` (chunk_size=1000, overlap=200) |
+| **임베딩 모델** | OpenAI `text-embedding-3-large` |
 | **벡터 DB**    | FAISS (로컬 저장 및 로딩 지원) |
 | **LLM**        | OpenAI `gpt-4o-mini` |
 | **Retriever**  | 문서 검색 + 대화 이력 기반 `create_history_aware_retriever()` |
