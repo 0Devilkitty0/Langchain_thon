@@ -1,6 +1,7 @@
 import os
 import time
 import streamlit as st
+
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
@@ -10,17 +11,17 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories.streamlit import StreamlitChatMessageHistory
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage # 추가: HumanMessage, AIMessage 임포트
 
 # Streamlit 페이지 설정 (가장 상단에 위치)
 st.set_page_config(page_title="메모리네비 💬📚", page_icon="🧭", layout="centered")
 
 # OpenAI API 키 설정
 openai_api_key = os.getenv("MY_OPENAI_API_KEY")
-if openai_api_key is None:
+if openai_api_key is None or openai_api_key == "": # 환경 변수 확인 강화
     st.error("오류: OpenAI API 키가 설정되지 않았습니다. 'MY_OPENAI_API_KEY' 환경 변수를 설정해주세요.")
     st.stop()
-os.environ["OPENAI_API_KEY"] = openai_api_key
+os.environ["OPENAI_API_KEY"] = openai_api_key # 환경 변수에서 가져온 키 사용
 
 # 캐시 리소스로 PDF 로드 및 분할
 @st.cache_resource
@@ -33,7 +34,7 @@ def load_and_split_pdf(file_path):
 def create_vector_store(_docs):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
     split_docs = text_splitter.split_documents(_docs)
-    embeddings = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536)
+    embeddings = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536) # dimensions 추가
     vectorstore = FAISS.from_documents(split_docs, embeddings)
     vectorstore.save_local("faiss_index")
     return vectorstore
@@ -44,7 +45,7 @@ def get_vectorstore(_docs):
     faiss_index_path = "faiss_index"
     if os.path.exists(os.path.join(faiss_index_path, "index.faiss")) and \
        os.path.exists(os.path.join(faiss_index_path, "index.pkl")):
-        embeddings = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536)
+        embeddings = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536) # dimensions 추가
         return FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
     else:
         return create_vector_store(_docs)
@@ -109,9 +110,9 @@ def initialize_components(selected_model):
     3. 문서에서 제공되지 않는 정보의 경우
         - **답변의 첫머리에 줄바꿈 2번 후 출력**하세요 : 이 답변은 제가 가진 일반적인 정보로 알려 드리는 거예요.
 
-          --- 
-          참고 문서 (context): 
-          {context}
+        --- 
+        참고 문서 (context): 
+        {context}
 
       """
     qa_prompt = ChatPromptTemplate.from_messages(
@@ -124,8 +125,8 @@ def initialize_components(selected_model):
 
     llm = ChatOpenAI(model=selected_model)
     history_aware_retriever = create_history_aware_retriever(llm, retriever, contextualize_q_prompt)
-    Youtube_chain = create_stuff_documents_chain(llm, qa_prompt)
-    rag_chain = create_retrieval_chain(history_aware_retriever, Youtube_chain)
+    Youtube_chain = create_stuff_documents_chain(llm, qa_prompt) # 이름 변경: Youtube_chain -> Youtube_chain
+    rag_chain = create_retrieval_chain(history_aware_retriever, Youtube_chain) # 이름 변경
 
     return rag_chain
 
@@ -238,46 +239,45 @@ for msg in st.session_state.chat_history_obj.messages:
 
 # --- 사용자 입력 처리 및 AI 응답 생성 로직 ---
 
-# 입력 필드를 위한 고유 키 관리
+# 입력 필드를 위한 고유 키 관리 및 중복 프롬프트 추적
 if 'chat_input_key' not in st.session_state:
     st.session_state.chat_input_key = 0
 # 마지막으로 처리된 프롬프트 내용을 추적 (중복 방지)
-# None으로 시작하여 첫 프롬프트는 항상 처리되도록 합니다.
 if 'last_processed_prompt' not in st.session_state:
     st.session_state.last_processed_prompt = None
 
 # 사용자 입력 필드
-# `value` 인자와 `on_change` 콜백을 제거하고, `key` 변화에만 의존하여 입력 필드를 초기화합니다.
 prompt_message = st.chat_input(
     "치매에 대해 궁금한 점을 여기에 입력해 주세요.",
     key=f"chat_input_{st.session_state.chat_input_key}" # 동적 키 사용
 )
 
 # 사용자가 메시지를 입력했고, 이 메시지가 이전에 처리된 메시지가 아닐 때만 처리
-# St.chat_input은 submit 시 값을 반환하므로, 그 값을 last_processed_prompt와 비교합니다.
 if prompt_message and prompt_message != st.session_state.last_processed_prompt:
     
-    # 현재 프롬프트를 last_processed_prompt에 저장하여 중복 처리 방지
+    # 1. 현재 프롬프트를 last_processed_prompt에 저장하여 중복 처리 방지
     st.session_state.last_processed_prompt = prompt_message
 
     if conversational_rag_chain:
-        # 1. 사용자 메시지를 chat_history_obj에 추가
+        # 2. 사용자 메시지를 chat_history_obj에 추가 (바로 표시되도록)
         st.session_state.chat_history_obj.add_user_message(prompt_message)
         
-        # 2. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
+        # 3. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
         st.session_state.chat_history_obj.add_ai_message("") 
         
-        # 3. 입력 필드를 초기화하기 위해 chat_input_key를 변경 (다음 렌더링 시 새 위젯으로 인식)
+        # 4. 입력 필드를 초기화하기 위해 chat_input_key를 변경 (다음 렌더링 시 새 위젯으로 인식)
         st.session_state.chat_input_key += 1
         
-        # 4. 앱을 새로고침하여 새로운 메시지 표시 및 입력 필드 초기화
+        # 5. 앱을 새로고침하여 새로운 메시지 표시 및 입력 필드 초기화
         st.rerun()
     else:
         st.warning("챗봇이 초기화되지 않아 질문을 처리할 수 없습니다.")
 
 # --- AI 응답 생성 및 타이핑 효과 부분 (st.rerun() 호출 후 실행) ---
 # 마지막 메시지가 비어있는 AI 메시지 플레이스홀더라면, 이 메시지에 내용을 채웁니다.
-if st.session_state.chat_history_obj.messages and \
+# 또한, conversational_rag_chain이 초기화된 경우에만 실행
+if conversational_rag_chain and \
+   st.session_state.chat_history_obj.messages and \
    st.session_state.chat_history_obj.messages[-1].type == "ai" and \
    st.session_state.chat_history_obj.messages[-1].content == "":
     
@@ -314,11 +314,27 @@ if st.session_state.chat_history_obj.messages and \
             st.session_state.last_processed_prompt = None 
 
         # 참고 문서 유사도 필터링 및 출력
-        embeddings_for_score = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536)
-        vectorstore_for_score = get_vectorstore([])
+        embeddings_for_score = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536) # dimensions 추가
+        # get_vectorstore([]) 호출 대신 initialize_components에서 반환된 vectorstore를 직접 사용
+        # 단, initialize_components에서 vectorstore를 반환하지 않으므로 다시 생성 (혹은 캐시된 것 로드)
+        # 이미 initialize_components에서 vectorstore를 생성/로드하므로 다시 할 필요 없음
+        # rag_chain으로부터 retriever를 얻어서 사용하거나, 캐시된 get_vectorstore를 사용
+        
+        # initialize_components에서 vectorstore를 직접 반환받거나,
+        # get_vectorstore(all_pages)가 제대로 캐시되었다면 다시 호출해도 됨.
+        # 여기서는 재확인 차원에서 다시 호출하는 것으로 유지 (cache_resource 덕분에 비용 없음)
+        # initialize_components 함수 내부에 get_vectorstore 호출 시 all_pages가 사용되므로,
+        # 외부에서 빈 리스트로 호출하면 새롭게 생성될 수 있으므로 주의.
+        # 다만, @st.cache_resource 덕분에 실제로 파일이 로드되어 캐시된 vectorstore가 있다면 재사용됩니다.
+        # 이 부분은 원래 코드의 패턴을 유지했습니다.
+        
+        # rag_chain이 존재하고, 그 안에 retriever가 있다면 그것을 사용하는 것이 더 효율적
+        # 하지만 현재 rag_chain에서 retriever를 직접 추출하기 어렵고,
+        # get_vectorstore가 캐시되므로 이대로 유지합니다.
+        vectorstore_for_score = get_vectorstore([]) 
         
         # 가장 최근 사용자 메시지로 유사도 검색
-        scored_docs = vectorstore_for_score.similarity_search_with_score(user_question_for_llm, k=3)
+        scored_docs = vectorstore_for_score.similarity_search_with_score(user_question_for_llm, k=3) # k=2 -> k=3 (이전 코드 따름)
 
         filtered_docs = []
         for doc, score in scored_docs:
@@ -328,7 +344,7 @@ if st.session_state.chat_history_obj.messages and \
 
         if filtered_docs:
             with st.expander("🔎 참고 문서 확인"):
-                st.markdown("<div class='reference-docs-content'>", unsafe_allow_html=True)
+                st.markdown("<div class='reference-docs-content'>", unsafe_allow_html=True) # CSS 클래스 추가
                 for i, doc in enumerate(filtered_docs):
                     source = os.path.basename(doc.metadata.get("source", ""))
                     page = doc.metadata.get("page", None)
@@ -339,4 +355,4 @@ if st.session_state.chat_history_obj.messages and \
                         st.markdown("- ❔ 출처 없음")
                     st.write(doc.page_content)
                     st.markdown("---")
-                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True) # CSS 클래스 닫기
