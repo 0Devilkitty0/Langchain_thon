@@ -33,6 +33,45 @@
 
 ---
 
+## RAG 처리 흐름도
+
+[PDF 문서 입력]
+        │
+        ▼
+[문서 로더]
+(PDF → 텍스트 분할)
+→ PyPDFLoader
+→ RecursiveCharacterTextSplitter
+        │
+        ▼
+[텍스트 임베딩]
+→ text-embedding-3-large
+        │
+        ▼
+[벡터 저장]
+→ FAISS 벡터 DB
+        │
+        ▼
+[질문 입력]
+        │
+        ▼
+[질문 리포맷]
+→ History-aware Retriever
+        │
+        ▼
+[유사 문서 검색]
+→ Top 2 검색
+        │
+        ▼
+[문서 기반 응답 생성]
+→ GPT-4o-mini + QA Prompt
+        │
+        ▼
+[Streamlit UI 출력]
+→ 사용자에게 응답 표시
+→ (참고 문서 펼치기 가능)
+
+
 ## 👴 페르소나: 관식 할아버지
 
 | 구분       | 내용 |
