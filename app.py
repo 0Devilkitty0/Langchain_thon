@@ -249,7 +249,11 @@ if 'last_processed_prompt' not in st.session_state:
 prompt_message = st.chat_input("치매에 대해 궁금한 점을 여기에 입력해 주세요.", key=f"chat_input_{st.session_state.chat_input_key}")
 
 # 사용자가 메시지를 입력했고, 이 메시지가 이전에 처리된 메시지가 아닐 때만 처리
-if prompt_message and prompt_message != st.session_state.last_processed_prompt:
+# 그리고 마지막 메시지가 'human' 타입이 아닐 때만 (중복 방지)
+if prompt_message and \
+   (prompt_message != st.session_state.last_processed_prompt or st.session_state.last_processed_prompt is None) and \
+   (not st.session_state.chat_history_obj.messages or st.session_state.chat_history_obj.messages[-1].type != "human"):
+    
     # 현재 프롬프트를 last_processed_prompt에 저장하여 중복 처리 방지
     st.session_state.last_processed_prompt = prompt_message
 
