@@ -243,6 +243,7 @@ for msg in st.session_state.chat_history_obj.messages:
 if 'chat_input_key' not in st.session_state:
     st.session_state.chat_input_key = 0
 # 마지막으로 처리된 프롬프트 내용을 추적 (중복 방지)
+# None으로 시작하여 첫 프롬프트는 항상 처리되도록 합니다.
 if 'last_processed_prompt' not in st.session_state:
     st.session_state.last_processed_prompt = None
 
@@ -254,6 +255,7 @@ prompt_message = st.chat_input(
 )
 
 # 사용자가 메시지를 입력했고, 이 메시지가 이전에 처리된 메시지가 아닐 때만 처리
+# St.chat_input은 submit 시 값을 반환하므로, 그 값을 last_processed_prompt와 비교합니다.
 if prompt_message and prompt_message != st.session_state.last_processed_prompt:
     
     # 현재 프롬프트를 last_processed_prompt에 저장하여 중복 처리 방지
@@ -309,7 +311,8 @@ if st.session_state.chat_history_obj.messages and \
             st.session_state.chat_history_obj.messages[-1].content = answer
             
             # AI 응답이 완료된 후 last_processed_prompt를 None으로 재설정하여 다음 새로운 입력을 받을 준비
-            st.session_state.last_processed_prompt = None # AI 응답 완료 후 초기화
+            # 이 시점에서 last_processed_prompt를 초기화해야 다음 동일한 질문을 받을 수 있습니다.
+            st.session_state.last_processed_prompt = None 
 
         # 참고 문서 유사도 필터링 및 출력
         embeddings_for_score = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536)
