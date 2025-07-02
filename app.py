@@ -239,23 +239,34 @@ for msg in st.session_state.chat_history_obj.messages:
 
 # --- 사용자 입력 처리 및 AI 응답 생성 로직 ---
 
-# 입력 필드를 위한 고유 키 관리
+# 입력 필드를 위한 고유 키 관리 및 이전 프롬프트 추적
 if 'chat_input_key' not in st.session_state:
     st.session_state.chat_input_key = 0
+if 'last_processed_prompt' not in st.session_state:
+    st.session_state.last_processed_prompt = None
 
-# st.chat_input은 한 번만 호출되도록 합니다.
+# 사용자 입력 필드
 prompt_message = st.chat_input("치매에 대해 궁금한 점을 여기에 입력해 주세요.", key=f"chat_input_{st.session_state.chat_input_key}")
 
-if prompt_message and conversational_rag_chain:
-    # 1. 사용자 메시지를 chat_history_obj에 추가
-    st.session_state.chat_history_obj.add_user_message(prompt_message)
-    
-    # 2. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
-    st.session_state.chat_history_obj.add_ai_message("") 
-    
-    # 3. 입력 필드를 초기화하기 위해 chat_input_key를 변경하고 st.rerun() 호출
-    st.session_state.chat_input_key += 1
-    st.rerun() 
+# 사용자가 메시지를 입력했고, 이 메시지가 이전에 처리된 메시지가 아닐 때만 처리
+if prompt_message and prompt_message != st.session_state.last_processed_prompt:
+    # 현재 프롬프트를 last_processed_prompt에 저장하여 중복 처리 방지
+    st.session_state.last_processed_prompt = prompt_message
+
+    if conversational_rag_chain:
+        # 1. 사용자 메시지를 chat_history_obj에 추가
+        st.session_state.chat_history_obj.add_user_message(prompt_message)
+        
+        # 2. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
+        st.session_state.chat_history_obj.add_ai_message("") 
+        
+        # 3. 입력 필드를 초기화하기 위해 chat_input_key를 변경
+        st.session_state.chat_input_key += 1
+        
+        # 4. 앱을 새로고침하여 새로운 메시지 표시 및 입력 필드 초기화
+        st.rerun()
+    else:
+        st.warning("챗봇이 초기화되지 않아 질문을 처리할 수 없습니다.")
 
 # --- AI 응답 생성 및 타이핑 효과 부분 (st.rerun() 호출 후 실행) ---
 # 마지막 메시지가 비어있는 AI 메시지 플레이스홀더라면, 이 메시지에 내용을 채웁니다.
@@ -287,6 +298,9 @@ if st.session_state.chat_history_obj.messages and \
 
             # 타이핑 효과가 끝난 후, chat_history_obj의 마지막 AI 메시지 내용을 실제 답변으로 업데이트
             st.session_state.chat_history_obj.messages[-1].content = answer
+            
+            # AI 응답이 완료된 후 last_processed_prompt를 None으로 재설정하여 다음 새로운 입력을 받을 준비
+            st.session_state.last_processed_prompt = None
 
         # 참고 문서 유사도 필터링 및 출력
         embeddings_for_score = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536)
