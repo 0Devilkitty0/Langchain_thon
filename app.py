@@ -208,90 +208,11 @@ div[data-testid="stChatMessage"][data-variant="assistant"]:first-of-type {
 selected_model = "gpt-4o-mini"
 rag_chain = initialize_components(selected_model)
 
-# StreamlitChatMessageHistory를 세션 상태에 저장하고 관리
-# 이 객체가 st.session_state["chat_messages"]와 연결됩니다.
+# StreamlitChatMessageHistory 인스턴스를 세션 상태에 유지
 if "chat_history_obj" not in st.session_state:
     st.session_state.chat_history_obj = StreamlitChatMessageHistory(key="chat_messages")
 
-# 초기 환영 메시지 (StreamlitChatMessageHistory에 없으면 추가)
-if not st.session_state.chat_history_obj.messages:
-    st.session_state.chat_history_obj.add_ai_message("치매에 대해 무엇이든 물어보세요! 🧠✨")
-
-#    `st.chat_message`는 메시지를 표시하는 역할만 하도록 합니다.
-for msg in st.session_state.chat_history_obj.messages:
-    if msg.type == "human":
-        with st.chat_message("human"):
-            st.markdown(f"<span style='font-size:24px; color:#007BFF;'>{msg.content}</span>", unsafe_allow_html=True)
-    elif msg.type == "ai":
-        if msg.content != "": # 내용이 있는 AI 메시지만 그립니다.
-            with st.chat_message("ai"):
-                st.markdown(f"<span style='font-size:24px;'>{msg.content}</span>", unsafe_allow_html=True)
-
-
-# rag_chain이 성공적으로 초기화되었을 때만 conversational_rag_chain을 생성
 if rag_chain:
-    conversational_rag_chain = RunnableWithMessageHistory(
-        rag_chain,
-        lambda session_id: st.session_state.chat_history_obj, # 세션에 저장된 StreamlitChatMessageHistory 객체 사용
-        input_messages_key="input",
-        history_messages_key="history",
-        output_messages_key="answer",
-    )
-else:
-    st.info("PDF 문서가 없거나 로드에 실패하여 챗봇을 사용할 수 없습니다. 'data' 폴더에 PDF 파일을 넣어주세요.")
-    conversational_rag_chain = None
-
-
-# 사용자가 질문을 입력하는 부분
-if prompt_message := st.chat_input("치매에 대해 궁금한 점을 여기에 입력해 주세요."):
-    if conversational_rag_chain:
-        # 사용자 메시지를 chat_history_obj에 추가
-        st.session_state.chat_history_obj.add_user_message(prompt_message)
-        
-        with st.chat_message("ai"):
-            message_placeholder = st.empty() # 이 placeholder에 응답을 점진적으로 표시
-
-            full_response = ""
-            with st.spinner("생각 중입니다... 🧐"):
-                config = {"configurable": {"session_id": "any"}}
-                
-                response = conversational_rag_chain.invoke(
-                    {"input": prompt_message}, 
-                    config
-                )
-                answer = response['answer']
-
-                # 타이핑 효과
-                for chunk in answer.split(" "):
-                    full_response += chunk + " "
-                    message_placeholder.markdown(f"<span style='font-size:24px;'>{full_response}</span>", unsafe_allow_html=True)
-                    time.sleep(0.05)
-
-# chat_history 대신 일반 리스트 사용
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# 초기 환영 메시지 (메시지 리스트에 없으면 추가)
-if not st.session_state.messages:
-    st.session_state.messages.append(AIMessage(content="치매에 대해 무엇이든 물어보세요! 🧠✨"))
-
-# 이전 대화 메시지 출력 (st.session_state.messages에서 읽어서 표시)
-for msg in st.session_state.messages:
-    if msg.type == "human":
-        with st.chat_message("human"):
-            st.markdown(f"<span style='font-size:24px; color:#007BFF;'>{msg.content}</span>", unsafe_allow_html=True)
-    else: # msg.type == "ai"
-        # AI 응답이 비어있지 않은 경우에만 표시 (타이핑 효과 중 빈 버블 중복 방지)
-        if msg.content != "":
-            with st.chat_message("ai"):
-                st.markdown(f"<span style='font-size:24px;'>{msg.content}</span>", unsafe_allow_html=True)
-
-# rag_chain이 성공적으로 초기화되었을 때만 conversational_rag_chain을 생성
-if rag_chain:
-    # StreamlitChatMessageHistory 인스턴스를 세션 상태에 유지
-    if "chat_history_obj" not in st.session_state:
-        st.session_state.chat_history_obj = StreamlitChatMessageHistory(key="chat_messages")
-
     conversational_rag_chain = RunnableWithMessageHistory(
         rag_chain,
         lambda session_id: st.session_state.chat_history_obj, # 세션에 저장된 객체 사용
@@ -303,11 +224,12 @@ else:
     st.info("PDF 문서가 없거나 로드에 실패하여 챗봇을 사용할 수 없습니다. 'data' 폴더에 PDF 파일을 넣어주세요.")
     conversational_rag_chain = None
 
+# 초기 환영 메시지 (히스토리에 없으면 추가)
 if not st.session_state.chat_history_obj.messages:
     st.session_state.chat_history_obj.add_ai_message("치매에 대해 무엇이든 물어보세요! 🧠✨")
 
+# 이전 대화 메시지 출력
 for msg in st.session_state.chat_history_obj.messages:
-  
     if msg.type == "human":
         with st.chat_message("human"):
             st.markdown(f"<span style='font-size:24px; color:#007BFF;'>{msg.content}</span>", unsafe_allow_html=True)
@@ -316,31 +238,33 @@ for msg in st.session_state.chat_history_obj.messages:
             st.markdown(f"<span style='font-size:24px;'>{msg.content}</span>", unsafe_allow_html=True)
 
 
-# 사용자가 질문을 입력하는 부분
-if prompt_message := st.chat_input("치매에 대해 궁금한 점을 여기에 입력해 주세요."):
+# 사용자가 질문을 입력하는 부분 - key를 추가하여 DuplicateElementId 오류 방지
+if prompt_message := st.chat_input("치매에 대해 궁금한 점을 여기에 입력해 주세요.", key="chat_input_unique_key"):
     if conversational_rag_chain:
         # 1. 사용자 메시지를 chat_history_obj에 추가
         st.session_state.chat_history_obj.add_user_message(prompt_message)
         
+        # 2. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
         st.session_state.chat_history_obj.add_ai_message("") 
         
         # 3. 앱을 새로고침하여 사용자 메시지(새로 추가된 것)가 표시되도록 합니다.
-        #    이때 빈 AI 버블은 위 렌더링 루프에서 건너뛰어져서 보이지 않습니다.
         st.rerun() 
 
+# --- AI 응답 생성 및 타이핑 효과 부분 (새로고침 후 실행) ---
+# 이 부분은 `st.rerun()` 호출 후, 앱이 다시 시작될 때 실행됩니다.
+# 마지막 메시지가 비어있는 AI 메시지 플레이스홀더라면, 이제 이 메시지에 내용을 채웁니다.
 if st.session_state.chat_history_obj.messages and \
    st.session_state.chat_history_obj.messages[-1].type == "ai" and \
    st.session_state.chat_history_obj.messages[-1].content == "":
     
+    # AI 메시지 버블을 그릴 위치를 지정
     with st.chat_message("ai"):
-        message_placeholder = st.empty() 
+        message_placeholder = st.empty() # 이 placeholder에 응답을 점진적으로 표시
         full_response = ""
 
         with st.spinner("생각 중입니다... 🧐"):
             config = {"configurable": {"session_id": "any"}}
             
-            # conversational_rag_chain.invoke 호출 시, LangChain이 내부적으로
-            # st.session_state.chat_history_obj를 사용하여 전체 대화 히스토리를 관리합니다.
             response = conversational_rag_chain.invoke(
                 {"input": st.session_state.chat_history_obj.messages[-2].content}, # 가장 최근 사용자 메시지
                 config
@@ -352,7 +276,8 @@ if st.session_state.chat_history_obj.messages and \
                 full_response += chunk + " "
                 message_placeholder.markdown(f"<span style='font-size:24px;'>{full_response}</span>", unsafe_allow_html=True)
                 time.sleep(0.05)
-                
+
+            # 타이핑 효과가 끝난 후, chat_history_obj의 마지막 AI 메시지 내용을 실제 답변으로 업데이트
             st.session_state.chat_history_obj.messages[-1].content = answer
 
         # 참고 문서 유사도 필터링 및 출력
