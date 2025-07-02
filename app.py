@@ -239,38 +239,62 @@ for msg in st.session_state.chat_history_obj.messages:
 
 # --- 사용자 입력 처리 및 AI 응답 생성 로직 ---
 
-# 입력 필드를 위한 고유 키 관리 및 이전 프롬프트 추적
-if 'chat_input_key' not in st.session_state:
-    st.session_state.chat_input_key = 0
-if 'last_processed_prompt' not in st.session_state:
-    st.session_state.last_processed_prompt = None
+# 입력 필드의 현재 값을 추적하기 위한 세션 상태
+if 'current_input_value' not in st.session_state:
+    st.session_state.current_input_value = ""
 
-# 사용자 입력 필드
-prompt_message = st.chat_input("치매에 대해 궁금한 점을 여기에 입력해 주세요.", key=f"chat_input_{st.session_state.chat_input_key}")
+# st.chat_input의 on_change 콜백 함수
+def handle_input_change():
+    """
+    st.chat_input의 값이 변경될 때 호출되어 세션 상태를 업데이트합니다.
+    """
+    # chat_input의 key는 f"chat_input_unique_key" 형태이므로, 이를 통해 값에 접근합니다.
+    # st.session_state.current_input_value = st.session_state[f"chat_input_unique_key"]
+    # 대신, st.session_state[chat_input_key_val]을 직접 사용합니다.
+    st.session_state.current_input_value = st.session_state["chat_input_main"]
 
-# 사용자가 메시지를 입력했고, 이 메시지가 이전에 처리된 메시지가 아닐 때만 처리
-# 그리고 마지막 메시지가 'human' 타입이 아닐 때만 (중복 방지)
-if prompt_message and \
-   (prompt_message != st.session_state.last_processed_prompt or st.session_state.last_processed_prompt is None) and \
-   (not st.session_state.chat_history_obj.messages or st.session_state.chat_history_obj.messages[-1].type != "human"):
-    
-    # 현재 프롬프트를 last_processed_prompt에 저장하여 중복 처리 방지
-    st.session_state.last_processed_prompt = prompt_message
 
-    if conversational_rag_chain:
-        # 1. 사용자 메시지를 chat_history_obj에 추가
-        st.session_state.chat_history_obj.add_user_message(prompt_message)
-        
-        # 2. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
-        st.session_state.chat_history_obj.add_ai_message("") 
-        
-        # 3. 입력 필드를 초기화하기 위해 chat_input_key를 변경
-        st.session_state.chat_input_key += 1
-        
-        # 4. 앱을 새로고침하여 새로운 메시지 표시 및 입력 필드 초기화
-        st.rerun()
-    else:
-        st.warning("챗봇이 초기화되지 않아 질문을 처리할 수 없습니다.")
+# st.chat_input의 value를 제어하기 위한 동적 키 및 값
+# 여기서는 `chat_input_main`이라는 고정 키를 사용하고 value를 st.session_state.current_input_value로 제어합니다.
+prompt_message = st.chat_input(
+    "치매에 대해 궁금한 점을 여기에 입력해 주세요.",
+    key="chat_input_main", # 고정된 키 사용
+    on_change=handle_input_change,
+    value=st.session_state.current_input_value # 세션 상태 값으로 입력 필드 제어
+)
+
+# 사용자가 메시지를 입력했고, 이 메시지가 비어있지 않을 때만 처리
+# 그리고 마지막으로 추가된 사용자 메시지와 동일하지 않을 때만 (중복 추가 방지)
+# `st.session_state.current_input_value`를 사용한 이유는 `prompt_message`가
+# `st.rerun()` 시에도 이전에 제출된 값을 일시적으로 가질 수 있기 때문입니다.
+# `st.session_state.current_input_value`는 `on_change` 콜백에 의해 직접적으로 업데이트되므로 더 신뢰할 수 있습니다.
+
+if st.session_state.current_input_value: # prompt_message 대신 current_input_value를 확인
+    user_message_content = st.session_state.current_input_value
+
+    # 중복 추가 방지: 마지막 메시지가 현재 사용자 입력과 동일한지 확인
+    is_duplicate_message = False
+    if st.session_state.chat_history_obj.messages:
+        last_msg = st.session_state.chat_history_obj.messages[-1]
+        if last_msg.type == "human" and last_msg.content == user_message_content:
+            is_duplicate_message = True
+
+    if not is_duplicate_message:
+        if conversational_rag_chain:
+            # 1. 사용자 메시지를 chat_history_obj에 추가
+            st.session_state.chat_history_obj.add_user_message(user_message_content)
+            
+            # 2. AI 응답을 위한 빈 플레이스홀더 메시지를 chat_history_obj에 추가
+            st.session_state.chat_history_obj.add_ai_message("") 
+            
+            # 3. 입력 필드를 초기화
+            st.session_state.current_input_value = "" # 입력 필드 값을 즉시 비웁니다.
+            
+            # 4. 앱을 새로고침하여 새로운 메시지 표시 및 입력 필드 초기화
+            st.rerun()
+        else:
+            st.warning("챗봇이 초기화되지 않아 질문을 처리할 수 없습니다.")
+
 
 # --- AI 응답 생성 및 타이핑 효과 부분 (st.rerun() 호출 후 실행) ---
 # 마지막 메시지가 비어있는 AI 메시지 플레이스홀더라면, 이 메시지에 내용을 채웁니다.
@@ -288,8 +312,12 @@ if st.session_state.chat_history_obj.messages and \
             
             # conversational_rag_chain.invoke 호출 시, LangChain이 내부적으로
             # st.session_state.chat_history_obj를 사용하여 전체 대화 히스토리를 관리합니다.
+            # 가장 최근 사용자 메시지는 chat_history_obj.messages[-2].content에 있습니다.
+            # 이 메시지가 실제 LLM에 보낼 사용자 질문입니다.
+            user_question_for_llm = st.session_state.chat_history_obj.messages[-2].content
+            
             response = conversational_rag_chain.invoke(
-                {"input": st.session_state.chat_history_obj.messages[-2].content}, # 가장 최근 사용자 메시지
+                {"input": user_question_for_llm},
                 config
             )
             answer = response['answer']
@@ -303,15 +331,17 @@ if st.session_state.chat_history_obj.messages and \
             # 타이핑 효과가 끝난 후, chat_history_obj의 마지막 AI 메시지 내용을 실제 답변으로 업데이트
             st.session_state.chat_history_obj.messages[-1].content = answer
             
-            # AI 응답이 완료된 후 last_processed_prompt를 None으로 재설정하여 다음 새로운 입력을 받을 준비
-            st.session_state.last_processed_prompt = None
+            # AI 응답이 완료되면 입력 필드를 초기화할 필요는 없습니다.
+            # 이미 입력 처리 부분에서 st.session_state.current_input_value를 ""로 설정했기 때문입니다.
+            # 이 로직은 불필요하게 `last_processed_prompt`를 초기화하지 않도록 제거합니다.
+
 
         # 참고 문서 유사도 필터링 및 출력
         embeddings_for_score = OpenAIEmbeddings(model='text-embedding-3-small', dimensions=1536)
         vectorstore_for_score = get_vectorstore([])
         
         # 가장 최근 사용자 메시지로 유사도 검색
-        scored_docs = vectorstore_for_score.similarity_search_with_score(st.session_state.chat_history_obj.messages[-2].content, k=3)
+        scored_docs = vectorstore_for_score.similarity_search_with_score(user_question_for_llm, k=3)
 
         filtered_docs = []
         for doc, score in scored_docs:
