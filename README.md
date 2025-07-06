@@ -90,6 +90,7 @@
 ---
 
 ## 모두의연구소 랭체인톤 프로잭트입니다.
-- [LangchainThon_MemoryNevi.pdf](https://github.com/user-attachments/files/21020923/LangchainThon_MemoryNevi.pdf)
+- 발표자료 : [LangchainThon_MemoryNevi.pdf](https://github.com/user-attachments/files/21020923/LangchainThon_MemoryNevi.pdf)
+- 시연영상 : [MemoryNevi - 4일간 만든 생성형 AI 프로젝트 시연 | LangChainthon 2025] (https://youtu.be/jP0lnaHuH3c)
 
 
